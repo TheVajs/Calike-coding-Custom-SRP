@@ -1,16 +1,15 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class CameraRenderer
+public partial class CameraRenderer
 {
 	static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
 
 	ScriptableRenderContext context;
 	Camera camera;
-	
+
 	const string bufferName = "Render Camera";
-	CommandBuffer buffer = new CommandBuffer
-	{ // nitializer syntax, same as buffer.name = bufferName;
+	CommandBuffer buffer = new CommandBuffer { // nitializer syntax, same as buffer.name = bufferName;
 		name = bufferName
 	};
 
@@ -21,29 +20,39 @@ public class CameraRenderer
 		this.context = context;
 		this.camera = camera;
 
+		PrepareBuffer();
+		PrepareForSceneWindow();
+
 		if (!Cull())
 			return;
 
 		Setup();
 		DrawVisibleGeometry();
+		DrawUnsupportedShaders();
+		DrawGizmos();
 		Submit();
 	}
 
 	void Setup()
-    {
+	{
 		context.SetupCameraProperties(camera);
-		buffer.ClearRenderTarget(true, true, Color.clear); // cloear depth, color, clear color 
-		buffer.BeginSample(bufferName);
+		CameraClearFlags flags = camera.clearFlags; // defines 4 values from 1-4 -> skybox, solidColor, depth, nothing
+		// cloear depth, color, clear color 
+		buffer.ClearRenderTarget(
+			flags <= CameraClearFlags.Depth, // clear depth if flag is set
+			flags == CameraClearFlags.Color, // clear color if flag is set
+			flags == CameraClearFlags.Color ? camera.backgroundColor.linear : Color.clear); 
+		buffer.BeginSample(SampleName);
 		ExecuteBuffer();
-    }
+	}
 
 	void DrawVisibleGeometry()
-    {
+	{
 		var sortingSettings = new SortingSettings(camera);
 		sortingSettings.criteria = SortingCriteria.CommonOpaque; // (front-to-back)
 
 		var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings);
-		var filteringSettings = new FilteringSettings(RenderQueueRange.opaque); 
+		var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
 		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings); // 1. draw only opque objects
 
@@ -55,13 +64,13 @@ public class CameraRenderer
 
 		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings); // 3. draw only transparent objects 
 	}
-
+	
 	void Submit()
-    {
-		buffer.EndSample(bufferName);
+	{
+		buffer.EndSample(SampleName);
 		ExecuteBuffer();
 		context.Submit();
-    }
+	}
 
 	void ExecuteBuffer()
 	{
@@ -71,11 +80,11 @@ public class CameraRenderer
 
 	bool Cull()
 	{
-        if (camera.TryGetCullingParameters(out ScriptableCullingParameters p)) // out - reference to the original struct, the method is responsible for setting the variable.
-        {
+		if (camera.TryGetCullingParameters(out ScriptableCullingParameters p)) // out - reference to the original struct, the method is responsible for setting the variable.
+		{
 			cullingResults = context.Cull(ref p); // ref - use for optimization, to not make copy of struct.
 			return true;
-        }
-        return false;
+		}
+		return false;
 	}
 }
