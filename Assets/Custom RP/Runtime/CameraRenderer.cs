@@ -15,7 +15,8 @@ public partial class CameraRenderer
 
 	CullingResults cullingResults;
 
-	public void Render(ScriptableRenderContext context, Camera camera)
+	public void Render(ScriptableRenderContext context, Camera camera,
+		bool useDynamicBatching, bool useGPUInstancing)
 	{
 		this.context = context;
 		this.camera = camera;
@@ -27,7 +28,7 @@ public partial class CameraRenderer
 			return;
 
 		Setup();
-		DrawVisibleGeometry();
+		DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
 		DrawUnsupportedShaders();
 		DrawGizmos();
 		Submit();
@@ -46,17 +47,22 @@ public partial class CameraRenderer
 		ExecuteBuffer();
 	}
 
-	void DrawVisibleGeometry()
+	void DrawVisibleGeometry(bool useDynamicBatching, bool useGPUInstancing)
 	{
 		var sortingSettings = new SortingSettings(camera);
 		sortingSettings.criteria = SortingCriteria.CommonOpaque; // (front-to-back)
 
-		var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings);
+		var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings)
+		{
+			enableDynamicBatching = useDynamicBatching,
+			enableInstancing = useGPUInstancing
+		};
 		var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
 		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings); // 1. draw only opque objects
 
-		context.DrawSkybox(camera); // 2. draw skybox
+		if (camera.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
+			context.DrawSkybox(camera); // 2. draw skybox
 
 		sortingSettings.criteria = SortingCriteria.CommonTransparent; // (back-to-front)
 		drawingSettings.sortingSettings = sortingSettings;
