@@ -10,7 +10,7 @@ Shader "Custom RP/Unlit"
 		[Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst Blend", Float) = 0
     	[Enum(Off, 0, On, 1)] _ZWrite ("Z Write", Float) = 1
     }
-
+	CustomEditor "CustomShaderGUI"
     SubShader
     {
         // Defines 1 way to render something.
@@ -22,6 +22,8 @@ Shader "Custom RP/Unlit"
             ZWrite [_ZWrite]
 
             HLSLPROGRAM
+            #pragma target 3.5 // turn off WebGL 1.0 and OpenGL ES 2.0 support
+
             // Pragma means action in greek
             // GPU instancing and works by issuing a single draw call for multiple objects with the same mesh at once.
             // Unity generates two instances of this shader, one with and one without GPU instancing support. This is added in inspector.
@@ -40,12 +42,9 @@ Shader "Custom RP/Unlit"
             SAMPLER(sampler_BaseMap);
             
             UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-            	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // Tilling and offset for base texture.
+                UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // Tilling and offset for base texture.
 	            UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
-                UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
-                /*
-                A material usually uses either transparency blending or alpha clipping, not both at the same time. A typical clip material is fully opaque except for the discarded fragments and does write to the depth buffer. It uses the AlphaTest render queue, which means that it gets rendered after all fully opaque objects. This is done because discarding fragments makes some GPU optimizations impossible, as triangles can no longer be assumed to entirely cover what's behind them. By drawing fully opaque objects first they might end up covering part of the alpha-clipped objects, which then don't need to process their hidden fragments.
-                */
+                UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff) // A material usually uses either transparency blending or alpha clipping, not both at the same time. A typical clip material is fully opaque except for the discarded fragments and does write to the depth buffer. It uses the AlphaTest render queue, which means that it gets rendered after all fully opaque objects. This is done because discarding fragments makes some GPU optimizations impossible, as triangles can no longer be assumed to entirely cover what's behind them. By drawing fully opaque objects first they might end up covering part of the alpha-clipped objects, which then don't need to process their hidden fragments.
             UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
             struct Attributes {
@@ -80,8 +79,7 @@ Shader "Custom RP/Unlit"
                 float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
 	            float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);  // copy material property.
 	            float4 base = baseMap * baseColor;
-                // It will abort and discard the fragment if the value we pass it is zero or less.
-	            #if defined(_CLIPPING)
+	            #if defined(_CLIPPING) // It will abort and discard the fragment if the value we pass it is zero or less.
 		            clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
 	            #endif
 	            return base;

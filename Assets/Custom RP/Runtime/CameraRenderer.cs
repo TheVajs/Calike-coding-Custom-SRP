@@ -1,9 +1,10 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
+// https://catlikecoding.com/unity/tutorials/custom-srp/custom-render-pipeline/
 public partial class CameraRenderer
 {
-	static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
+	static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"), litShaderId = new ShaderTagId("CustomLit");
 
 	ScriptableRenderContext context;
 	Camera camera;
@@ -15,6 +16,9 @@ public partial class CameraRenderer
 
 	CullingResults cullingResults;
 
+	Lighting lighting = new Lighting();
+
+	// https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html context
 	public void Render(ScriptableRenderContext context, Camera camera,
 		bool useDynamicBatching, bool useGPUInstancing)
 	{
@@ -28,6 +32,7 @@ public partial class CameraRenderer
 			return;
 
 		Setup();
+		lighting.Setup(context, cullingResults);
 		DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
 		DrawUnsupportedShaders();
 		DrawGizmos();
@@ -57,6 +62,7 @@ public partial class CameraRenderer
 			enableDynamicBatching = useDynamicBatching,
 			enableInstancing = useGPUInstancing
 		};
+		drawingSettings.SetShaderPassName(1, litShaderId);
 		var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
 		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings); // 1. draw only opque objects

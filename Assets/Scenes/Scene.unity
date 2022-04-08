@@ -9534,7 +9534,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  material: {fileID: 2100000, guid: 904418d735beb104a9ae0422d4d79f86, type: 2}
+  material: {fileID: 2100000, guid: e5b0d1bf00f4c814795652697767ae43, type: 2}
 --- !u!1 &2100858901
 GameObject:
   m_ObjectHideFlags: 0

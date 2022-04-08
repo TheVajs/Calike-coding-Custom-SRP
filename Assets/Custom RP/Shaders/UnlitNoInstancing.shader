@@ -24,10 +24,17 @@ Shader "Custom RP/UnlitNoInstancing"
 #define CUSTOM_UNLIT_PASS_INCLUDED
 
             // Constant memory buffer, although it remains accessible at the global level.
-            //CBUFFER_START(UnityPerMaterial) // cbuffer - for some platforms it doesn't exsist, so use macros and let unity handle.
-	        //    float4 _BaseColor;
-            //CBUFFER_END
-            UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
+            /* CBUFFER_START(UnityPerMaterial) // cbuffer - for some platforms it doesn't exsist, so use macros and let unity handle.
+                float4 _BaseColor;
+            CBUFFER_END */
+            /*CBUFFER_START(UnityPerDraw) 
+                float4x4 unity_ObjectToWorld;
+                float4x4 unity_WorldToObject;
+                float4 unity_LODFade;
+                real4 unity_WroldTransformParams; //
+            CBUFFER_END */ // CBUFFER_START switched with UNITY_INSTANCING_BUFFER_START
+
+            UNITY_INSTANCING_BUFFER_START(UnityPerMaterial) // Per instance different colors.
 	            UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
             UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
