@@ -9,14 +9,15 @@ using UnityEngine;
 public class CustomRenderPipelineAsset : RenderPipelineAsset
 {
     // Unity editor will create a new RP instance when it detects that the asset is changed.
-    [SerializeField]
-    bool useDynamicBatching = true, // 
-        useGPUInstancing = true,    // 
-        useSRPBatcher = true;       // Process of combining draw calls, reducing the time spent communicating between CPU ang GPU.
+    [SerializeField] private bool useDynamicBatching = true; // 
+    [SerializeField] private bool useGPUInstancing = true;    // 
+    [SerializeField] private bool useSRPBatcher = true;       // Process of combining draw calls, reducing the time spent communicating between CPU ang GPU.
 
+    [SerializeField] private ShadowSettings shadows = default;
+    
     protected override RenderPipeline CreatePipeline()
     {
-        return new CustomRenderPipeline(useDynamicBatching, useGPUInstancing, useSRPBatcher);
+        return new CustomRenderPipeline(useDynamicBatching, useGPUInstancing, useSRPBatcher, shadows);
     }
 
 }

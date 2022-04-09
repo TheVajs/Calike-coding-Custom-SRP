@@ -4,7 +4,7 @@ Shader "Custom RP/Lit"
     {
         _BaseMap("Texture", 2D) = "white" {}
         _BaseColor("Color", Color) = (.5, .5, .5, 1.0)
-        _Metallic("Metalic", Range(0.0, 1.0)) = 0.0
+        _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.0
         [Toggle(_CLIPPING)] _Clipping("Alpha Clipping", Float) = 0

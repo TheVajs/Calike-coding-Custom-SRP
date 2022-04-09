@@ -20,7 +20,7 @@ public partial class CameraRenderer
 
 	// https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html context
 	public void Render(ScriptableRenderContext context, Camera camera,
-		bool useDynamicBatching, bool useGPUInstancing)
+		bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings)
 	{
 		this.context = context;
 		this.camera = camera;
@@ -28,11 +28,11 @@ public partial class CameraRenderer
 		PrepareBuffer();
 		PrepareForSceneWindow();
 
-		if (!Cull())
+		if (!Cull(shadowSettings.maxDistance))
 			return;
 
 		Setup();
-		lighting.Setup(context, cullingResults);
+		lighting.Setup(context, cullingResults, shadowSettings);
 		DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
 		DrawUnsupportedShaders();
 		DrawGizmos();
@@ -90,10 +90,11 @@ public partial class CameraRenderer
 		buffer.Clear();
 	}
 
-	bool Cull()
+	bool Cull(float maxShadowDistance)
 	{
 		if (camera.TryGetCullingParameters(out ScriptableCullingParameters p)) // out - reference to the original struct, the method is responsible for setting the variable.
 		{
+			p.shadowDistance = Mathf.Min(maxShadowDistance, camera.farClipPlane);;
 			cullingResults = context.Cull(ref p); // ref - use for optimization, to not make copy of struct.
 			return true;
 		}

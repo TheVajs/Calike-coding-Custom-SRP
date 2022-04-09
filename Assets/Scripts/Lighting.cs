@@ -24,7 +24,7 @@ public class Lighting
         dirLightColors = new Vector4[numDirLightCount],
         dirLightDirections = new Vector4[numDirLightCount];
 
-    public void Setup(ScriptableRenderContext context, CullingResults cullingResults) 
+    public void Setup(ScriptableRenderContext context, CullingResults cullingResults, ShadowSettings shadowSettings) 
     {
         this.cullingResults = cullingResults;
         commandBuffer.BeginSample(bufferName);
