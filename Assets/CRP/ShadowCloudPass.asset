@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7967b5bdeb245fa87ad2cd559cf457a, type: 3}
+  m_Name: ShadowCloudPass
+  m_EditorClassIdentifier: 
+  shader: {fileID: 4800000, guid: 34200d1ba0a94ddeb88fd9c613984a87, type: 3}
+  texture: {fileID: 2800000, guid: 127ac193b2edcd24d858957ed44fa3e0, type: 3}

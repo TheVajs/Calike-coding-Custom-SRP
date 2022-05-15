@@ -4,100 +4,199 @@ using UnityEngine.Rendering;
 // https://catlikecoding.com/unity/tutorials/custom-srp/custom-render-pipeline/
 public partial class CameraRenderer
 {
-	static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"), litShaderId = new ShaderTagId("CustomLit");
+	private static readonly ShaderTagId UnlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
+	private static readonly ShaderTagId LitShaderId = new ShaderTagId("CustomLit");
+	private static readonly ShaderTagId NormalOnlyShaderId = new ShaderTagId("NormalOnly");
+	private static readonly ShaderTagId DepthOnlyShaderId = new ShaderTagId("DepthOnly");
 
-	ScriptableRenderContext context;
-	Camera camera;
+	private ScriptableRenderContext _context;
+	private Camera _camera;
 
-	const string bufferName = "Render Camera";
-	CommandBuffer buffer = new CommandBuffer { // nitializer syntax, same as buffer.name = bufferName;
-		name = bufferName
+	private const string BufferName = "Render Camera";
+	private readonly CommandBuffer _buffer = new CommandBuffer { // initializer syntax, same as buffer.name = bufferName;
+		name = BufferName
 	};
 
-	CullingResults cullingResults;
+	private CullingResults _cullingResults;
 
-	Lighting lighting = new Lighting();
+	private readonly Lighting _lighting = new Lighting();
+	private readonly Params _params = new Params();
 
+	private readonly int _normalTextureShaderId = Shader.PropertyToID("_CameraNormalsTexture");
+	private const string BufferNormalName = "Normal Only Pass";
+	private readonly CommandBuffer _normalBuffer = new CommandBuffer {
+		name = BufferNormalName
+	};
+	
+	private readonly int _depthPrpasTextureIdentifier;
+
+	private readonly Material _materialDepthOnly = new Material(Shader.Find("hidden/DepthOnly"))
+	{
+		hideFlags = HideFlags.HideAndDontSave
+	};
+	
+	private readonly int _depthTextureShaderId = Shader.PropertyToID("_CameraDepthTexture");
+	private const string BufferDepthName = "Depth Only Pass";
+	private readonly CommandBuffer _depthBuffer = new CommandBuffer {
+		name = BufferDepthName
+	};
+	
+	private  void ExecuteDepthOnly()
+	{
+		_normalBuffer.GetTemporaryRT(
+			_normalTextureShaderId, _camera.pixelWidth, _camera.pixelHeight,
+			32, FilterMode.Point, RenderTextureFormat.ARGB32
+		);
+		_normalBuffer.SetRenderTarget(
+			_normalTextureShaderId,
+			RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare, 
+			RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store
+		);
+		_normalBuffer.ClearRenderTarget(true, true, Color.clear);
+		_normalBuffer.BeginSample(BufferNormalName);
+		_context.SetupCameraProperties(_camera);
+		ExecuteBuffer(_normalBuffer);
+
+		var sortingSettings = new SortingSettings(_camera) { criteria = SortingCriteria.CommonOpaque };
+		var drawingSettings = new DrawingSettings(NormalOnlyShaderId, sortingSettings);
+		drawingSettings.perObjectData = PerObjectData.None;
+		
+		var filterSettings = new FilteringSettings(RenderQueueRange.opaque);
+		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filterSettings);
+
+		_normalBuffer.SetGlobalTexture("_CameraNormalsTexture", _normalTextureShaderId);
+		_normalBuffer.EndSample(BufferNormalName);
+		ExecuteBuffer(_normalBuffer);
+		
+		// ===============
+		
+		_depthBuffer.GetTemporaryRT(
+			_depthTextureShaderId, _camera.pixelWidth, _camera.pixelHeight,
+			32, FilterMode.Point, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear
+		);
+		_depthBuffer.SetRenderTarget(
+			_depthTextureShaderId,
+			RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare, 
+			RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store
+		);
+		_depthBuffer.ClearRenderTarget(true, false, Color.clear);
+		_depthBuffer.BeginSample(BufferDepthName);
+		ExecuteBuffer(_depthBuffer);
+		
+		drawingSettings = new DrawingSettings(DepthOnlyShaderId, sortingSettings);
+		drawingSettings.perObjectData = PerObjectData.None;
+		
+		filterSettings = new FilteringSettings(RenderQueueRange.opaque);
+		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filterSettings);
+		
+		_depthBuffer.SetGlobalTexture("_CameraDepthTexture", _depthTextureShaderId);
+		_depthBuffer.EndSample(BufferDepthName);
+		ExecuteBuffer(_depthBuffer);
+	}
+	
 	// https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html context
 	public void Render(ScriptableRenderContext context, Camera camera,
 		bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings)
 	{
-		this.context = context;
-		this.camera = camera;
-
+		_context = context;
+		_camera = camera;
+		
 		PrepareBuffer();
 		PrepareForSceneWindow();
 
 		if (!Cull(shadowSettings.maxDistance))
+		{
 			return;
-
+		}
+		
+		// : Pre passes
+		ExecuteDepthOnly();
+		// :
+		
+		_lighting.Setup(context, _cullingResults, shadowSettings);		
+		_params.Setup(context, camera);
+		
 		Setup();
-		lighting.Setup(context, cullingResults, shadowSettings);
 		DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
 		DrawUnsupportedShaders();
 		DrawGizmos();
+		
+		// : Post processing
+
+		// :
+
+		Cleanup();
 		Submit();
 	}
-
-	void Setup()
-	{
-		context.SetupCameraProperties(camera);
-		CameraClearFlags flags = camera.clearFlags; // defines 4 values from 1-4 -> skybox, solidColor, depth, nothing
-		// cloear depth, color, clear color 
-		buffer.ClearRenderTarget(
-			flags <= CameraClearFlags.Depth, // clear depth if flag is set
-			flags == CameraClearFlags.Color, // clear color if flag is set
-			flags == CameraClearFlags.Color ? camera.backgroundColor.linear : Color.clear); 
-		buffer.BeginSample(SampleName);
-		ExecuteBuffer();
+	
+	void Cleanup () {
+		_lighting.Cleanup();
+		_normalBuffer.ReleaseTemporaryRT(_normalTextureShaderId);
+		_depthBuffer.ReleaseTemporaryRT(_depthTextureShaderId);
 	}
 
-	void DrawVisibleGeometry(bool useDynamicBatching, bool useGPUInstancing)
+	private void Setup()
 	{
-		var sortingSettings = new SortingSettings(camera);
-		sortingSettings.criteria = SortingCriteria.CommonOpaque; // (front-to-back)
+		_buffer.SetRenderTarget(_camera.targetTexture);
+		_context.SetupCameraProperties(_camera);
+		var flags = _camera.clearFlags; // defines 4 values from 1-4 -> skybox, solidColor, depth, nothing
+		// cloear depth, color, clear color 
+		_buffer.ClearRenderTarget(
+			flags <= CameraClearFlags.Depth, // clear depth if flag is set
+			flags == CameraClearFlags.Color, // clear color if flag is set
+			flags == CameraClearFlags.Color ? _camera.backgroundColor.linear : Color.clear); 
+		_buffer.BeginSample(SampleName);
+		ExecuteBuffer(_buffer);
+	}
 
-		var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings)
+	private void DrawVisibleGeometry(bool useDynamicBatching, bool useGPUInstancing)
+	{
+		var sortingSettings = new SortingSettings(_camera)
+		{
+			criteria = SortingCriteria.CommonOpaque	
+		};
+
+		var drawingSettings = new DrawingSettings(UnlitShaderTagId, sortingSettings)
 		{
 			enableDynamicBatching = useDynamicBatching,
 			enableInstancing = useGPUInstancing
 		};
-		drawingSettings.SetShaderPassName(1, litShaderId);
+		drawingSettings.SetShaderPassName(1, LitShaderId);
 		var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
-		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings); // 1. draw only opque objects
+		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filteringSettings);
 
-		if (camera.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null)
-			context.DrawSkybox(camera); // 2. draw skybox
-
-		sortingSettings.criteria = SortingCriteria.CommonTransparent; // (back-to-front)
+		if (_camera.clearFlags == CameraClearFlags.Skybox && RenderSettings.skybox != null) 
+		{
+			_context.DrawSkybox(_camera);
+		}
+		
+		sortingSettings.criteria = SortingCriteria.CommonTransparent;
 		drawingSettings.sortingSettings = sortingSettings;
 		filteringSettings.renderQueueRange = RenderQueueRange.transparent;
 
-		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings); // 3. draw only transparent objects 
+		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filteringSettings);
 	}
 	
-	void Submit()
+	private void Submit()
 	{
-		buffer.EndSample(SampleName);
-		ExecuteBuffer();
-		context.Submit();
+		_buffer.EndSample(SampleName);
+		ExecuteBuffer(_buffer);
+		_context.Submit();
 	}
 
-	void ExecuteBuffer()
+	private void ExecuteBuffer(CommandBuffer cmd)
 	{
-		context.ExecuteCommandBuffer(buffer);
-		buffer.Clear();
+		_context.ExecuteCommandBuffer(cmd);
+		cmd.Clear();
 	}
 
-	bool Cull(float maxShadowDistance)
+	private bool Cull(float maxShadowDistance)
 	{
-		if (camera.TryGetCullingParameters(out ScriptableCullingParameters p)) // out - reference to the original struct, the method is responsible for setting the variable.
-		{
-			p.shadowDistance = Mathf.Min(maxShadowDistance, camera.farClipPlane);;
-			cullingResults = context.Cull(ref p); // ref - use for optimization, to not make copy of struct.
-			return true;
-		}
-		return false;
+		if (!_camera.TryGetCullingParameters(out var p)) return false;
+		
+		p.shadowDistance = Mathf.Min(maxShadowDistance, _camera.farClipPlane);
+		_cullingResults = _context.Cull(ref p);
+		return true;
 	}
 }

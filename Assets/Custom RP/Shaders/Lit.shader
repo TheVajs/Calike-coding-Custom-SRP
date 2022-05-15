@@ -14,6 +14,7 @@ Shader "Custom RP/Lit"
         [Enum(Off, 0, On, 1)] _ZWrite("Z Write", Float) = 1
     }
     CustomEditor "CustomShaderGUI"
+    
     SubShader
     {
         // Defines 1 way to render something.
@@ -41,6 +42,7 @@ Shader "Custom RP/Lit"
             
             #include "../ShaderLibrary/Common.hlsl"
             #include "../ShaderLibrary/Surface.hlsl"
+            #include "../ShaderLibrary/Shadows.hlsl"
             #include "../ShaderLibrary/Light.hlsl"
             #include "../ShaderLibrary/BRDF.hlsl"
             #include "../ShaderLibrary/Lighting.hlsl"
@@ -93,7 +95,6 @@ Shader "Custom RP/Lit"
 
             float4 LitPassFragment(Varyings input) : SV_TARGET {
                 UNITY_SETUP_INSTANCE_ID(input);
-
                 float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
                 float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);  // copy material property.
             
@@ -101,17 +102,21 @@ Shader "Custom RP/Lit"
                 float4 base = baseMap * baseColor;
 
                 Surface surface;
+                surface.position = input.positionWS;
+                surface.positionCS = input.positionCS.xyz;
                 surface.normal = normalize(input.normalWS);
                 surface.viewDirection = normalize(_WorldSpaceCameraPos - input.positionWS);
                 surface.color = base.rgb;
                 surface.alpha = base.a;
                 surface.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
                 surface.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
+                
                 #if defined(_PREMULTIPLY_ALPHA)
                     BRDF brdf = GetBRDF(surface, true);
                 #else
                     BRDF brdf = GetBRDF(surface);
                 #endif
+
                 float3 color = CalculateLighting(surface, brdf);
 
                 #if defined(_CLIPPING) // It will abort and discard the fragment if the value we pass it is zero or less.
@@ -123,5 +128,22 @@ Shader "Custom RP/Lit"
 
             ENDHLSL
         }
+        
+        Pass {
+			Tags {
+				"LightMode" = "ShadowCaster"
+			}
+
+			ColorMask 0
+
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma shader_feature _CLIPPING
+			#pragma multi_compile_instancing
+			#pragma vertex ShadowCasterPassVertex
+			#pragma fragment ShadowCasterPassFragment
+			#include "../ShaderLibrary/ShadowCasterPass.hlsl"
+			ENDHLSL
+		}
     }
 }

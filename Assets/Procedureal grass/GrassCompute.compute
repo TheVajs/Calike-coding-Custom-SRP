@@ -1,0 +1,157 @@
+// Each #kernel tells a function to compile for dispatch
+#pragma kernel Main // Complie looks for a function named Main
+
+//#include "../Custom RP/ShaderLibrary/Shadows.hlsl"
+
+#define MAX_DIRECTIONAL_LIGHT_COUNT 4
+float4x4 _DirectionalShadowMatrices[MAX_DIRECTIONAL_LIGHT_COUNT];
+float4 _DirectionalLightShadowData[MAX_DIRECTIONAL_LIGHT_COUNT];
+
+struct SourceVertex {
+	float3 positionOS;
+	float3 normalOS;
+	float2 offset;
+	uint color;
+};
+
+StructuredBuffer<SourceVertex> _SourceVertices;
+
+struct DrawVertex {
+	float3 positionWS;
+	float2 uv;
+};
+
+struct DrawTriangle {
+	uint color;
+	float3 positionWS;
+	float3 normalWS; 
+	DrawVertex vertices[3];
+};
+
+AppendStructuredBuffer<DrawTriangle> _DrawTriangles;
+
+// The GPU engines reads this buffer to know, how many vertices are in the draw buffer
+struct IndirectArgs {
+	uint numOfVerticesPerInstance;
+	uint numInstances;
+	uint startVertexIndex;
+	uint startInsanceIndex;
+};
+
+RWStructuredBuffer<IndirectArgs> _IndirectArgsBuffer;
+
+uint _NumSourceVertices; 
+float4x4 _LocalToWorld, _WorldToObject, _LocalToWorldNormal, _CameraViewMatrix, _CameraYMatrix;
+float3 _WorldSpaceCameraPos, _CameraDirection;
+float4 _ScreenParams, _ZBufferParams;
+float4x4 _CameraProjection, _CameraVPMatrix;
+
+//Texture2D<float4> _DirectionalShadowAtlas;
+//uniform float4x4 _DirectionalShadowMatrices;
+//SamplerState linearClampSampler;
+
+Texture2D<float4> _DirectionalShadowAtlas;
+SamplerState sampler_DirectionalShadowAtlas;
+
+inline float LinearEyeDepth(float z)
+{
+	return 1.0 / (_ZBufferParams.z * z + _ZBufferParams.w);
+} 
+
+inline float4 WorldSpacePixelSnap (float4 pos) {
+	//float ppu = _PixelsPerUnit;
+	float zoom = 1/(_CameraProjection[1][1]);
+	float ppu = _ScreenParams.y / zoom / 2;
+
+	//pos = mul(_LocalToWorld, pos);
+	
+	// World space Pixel Snapping
+	pos = floor(pos * ppu + 1 / ppu) / ppu;
+
+	// Adjust to pixel relative to camera position
+	float3 snappedCameraPosition = floor(_WorldSpaceCameraPos * ppu + 1 / ppu) / ppu;
+	//	snappedCameraPosition = mul((float3x3)  UNITY_MATRIX_P, snappedCameraPosition);
+	float3 cameraSubpixelOffset = snappedCameraPosition - _WorldSpaceCameraPos;
+	pos.x -= cameraSubpixelOffset.x;
+	pos.y -= cameraSubpixelOffset.y;
+	// pos.z -= cameraSubpixelOffset.z;
+
+	// Odd resolution handling
+	float2 odd = round(_ScreenParams.xy) % 2;
+	pos.x += odd.x * 0.5 / ppu;
+	pos.y += odd.y * 0.5 / ppu;
+	return pos;
+}
+
+DrawVertex SetupVertice(float3 anchorWS, float2 position, float2 uv) {
+	float zoom = 1/(_CameraProjection[1][1]);
+	float ppu = _ScreenParams.y / zoom / 2;
+
+	float4 s = float4((.5-position.x) * (16/ppu), position.y * (16/ppu), 0, 1);
+	
+	DrawVertex output;
+	output.positionWS = anchorWS + mul((float3x3) _CameraYMatrix, s.xyz); // WorldSpacePixelSnap(float4(mul((float3x3) _CameraViewMatrix, s.xyz), 1)).xyz;
+	output.uv = uv;
+	return output;
+}
+
+[numthreads(128, 1, 1)]
+void Main(uint3 id : SV_DispatchThreadID) {
+	if(id.x >= _NumSourceVertices)
+		return;
+
+	//float2 clip = mul(_CameraVPMatrix, float4(positionWS, 1)).xy;
+	//float2 uv = clip;
+	
+	//float4 lightDepth = SHADOW_SAMPLER(_DirectionalShadowAtlas); //_DirectionalShadowAtlas.Load(uint3(id.x, id.y, 1)); //.SampleLevel(linearClampSampler, uv, 0);
+	
+	//uint i = id.x * 128 + id.x;
+	//float depth = LinearEyeDepth(_CameraDepthTexture[i]);
+	//float3 worldspace = _CameraDirection * depth + _WorldSpaceCameraPos;
+
+	
+	SourceVertex sourceVertex = _SourceVertices[id.x];
+
+	float3 positionWS = mul(_LocalToWorld, float4(sourceVertex.positionOS, 1)).xyz;
+	float3 normalWS = mul((float3x3)_LocalToWorldNormal , sourceVertex.normalOS);
+	
+	float x = sourceVertex.offset.x, y = sourceVertex.offset.y, fac = 0.25;
+
+	// Create quad
+	DrawVertex vertices[4];
+	vertices[0] = SetupVertice(positionWS, float2(0, 0), float2(x, y));
+	vertices[1] = SetupVertice(positionWS, float2(0, 1.15), float2(x, y + fac));
+	vertices[2] = SetupVertice(positionWS, float2(1, 0), float2(x + fac, y));
+	vertices[3] = SetupVertice(positionWS, float2(1, 1.15), float2(x + fac, y + fac));
+
+	// Shadow color
+	float strength = _DirectionalLightShadowData[0].x;
+	float3 normalBias = normalWS * _DirectionalLightShadowData[0].z;
+	float4x4 mat = _DirectionalShadowMatrices[_DirectionalLightShadowData[0].y];
+	float3 positionSTS = mul(mat, float4(positionWS + normalBias, 1.0)).xyz;
+	float shadow = _DirectionalShadowAtlas.SampleLevel(sampler_DirectionalShadowAtlas, positionSTS, 0).r;
+	float atten = lerp(1.0, shadow, strength);
+
+	DrawTriangle tri = (DrawTriangle)0;
+	tri.positionWS = positionWS;
+	tri.normalWS = normalWS;
+	tri.color = sourceVertex.color; // shadow.rrr; //
+	tri.vertices[0] = vertices[2];
+	tri.vertices[1] = vertices[1];
+	tri.vertices[2] = vertices[0];
+	_DrawTriangles.Append(tri);
+
+	DrawTriangle tri1 = (DrawTriangle)0;
+	tri1.positionWS = positionWS;
+	tri1.normalWS = normalWS;
+	tri1.color = sourceVertex.color; // shadow.rrr; //
+	tri1.vertices[0] = vertices[1];
+	tri1.vertices[1] = vertices[2];
+	tri1.vertices[2] = vertices[3];
+	_DrawTriangles.Append(tri1);
+
+	// InterlockedAdd(a, b) adds b o a and stores the value in a. Is is thread-safe
+	// This call counts the number of vertices, storing it in the indirect arguments
+	// This tells the renderer how many vertices are in the mesh in DrawProcedural
+	InterlockedAdd(_IndirectArgsBuffer[0].numOfVerticesPerInstance, 2 * 3);
+}

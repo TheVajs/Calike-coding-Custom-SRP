@@ -15,7 +15,7 @@ public partial class CameraRenderer
 	partial void PrepareBuffer()
 	{
 		Profiler.BeginSample("Editor only");
-		buffer.name = SampleName = camera.name;
+		_buffer.name = SampleName = _camera.name;
 		Profiler.EndSample();
 	}
 #else
@@ -39,16 +39,16 @@ public partial class CameraRenderer
 	// Add UI to world geometry.
 	partial void PrepareForSceneWindow()
 	{
-		if (camera.cameraType == CameraType.SceneView)
-			ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
+		if (_camera.cameraType == CameraType.SceneView)
+			ScriptableRenderContext.EmitWorldGeometryForSceneView(_camera);
 	}
 
 	partial void DrawGizmos()
 	{
 		if (Handles.ShouldRenderGizmos())
 		{
-			context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
-			context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
+			_context.DrawGizmos(_camera, GizmoSubset.PreImageEffects);
+			_context.DrawGizmos(_camera, GizmoSubset.PostImageEffects);
 		}
 	}
 
@@ -57,7 +57,7 @@ public partial class CameraRenderer
 		if (errorMaterial == null)
 			errorMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
 
-		var drawingSettings = new DrawingSettings(legacyShaderTagIds[0], new SortingSettings(camera)); // for all shaders in separated pass.
+		var drawingSettings = new DrawingSettings(legacyShaderTagIds[0], new SortingSettings(_camera)); // for all shaders in separated pass.
 		drawingSettings.overrideMaterial = errorMaterial;
 
 		for (int i = 1; i < legacyShaderTagIds.Length; i++)
@@ -66,7 +66,7 @@ public partial class CameraRenderer
 		}
 
 		var filteringSettings = FilteringSettings.defaultValue;
-		context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings);
+		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filteringSettings);
 	}
 
 #endif

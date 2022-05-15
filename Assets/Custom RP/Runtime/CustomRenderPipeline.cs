@@ -20,7 +20,7 @@ public class CustomRenderPipeline : RenderPipeline
 
     protected override void Render(ScriptableRenderContext context, Camera[] cameras)
     {
-        foreach (Camera cam in cameras)
+        foreach (var cam in cameras)
         {
             _renderer.Render(context, cam, _useDynamicBatching, _useGPUInstancing, _shadowSettings);
         }
