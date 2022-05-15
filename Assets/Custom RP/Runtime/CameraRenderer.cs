@@ -58,9 +58,11 @@ public partial class CameraRenderer
 		ExecuteBuffer(_normalBuffer);
 
 		var sortingSettings = new SortingSettings(_camera) { criteria = SortingCriteria.CommonOpaque };
-		var drawingSettings = new DrawingSettings(NormalOnlyShaderId, sortingSettings);
-		drawingSettings.perObjectData = PerObjectData.None;
-		
+		var drawingSettings = new DrawingSettings(NormalOnlyShaderId, sortingSettings)
+		{
+			perObjectData = PerObjectData.None
+		};
+
 		var filterSettings = new FilteringSettings(RenderQueueRange.opaque);
 		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filterSettings);
 
@@ -83,9 +85,11 @@ public partial class CameraRenderer
 		_depthBuffer.BeginSample(BufferDepthName);
 		ExecuteBuffer(_depthBuffer);
 		
-		drawingSettings = new DrawingSettings(DepthOnlyShaderId, sortingSettings);
-		drawingSettings.perObjectData = PerObjectData.None;
-		
+		drawingSettings = new DrawingSettings(DepthOnlyShaderId, sortingSettings)
+		{
+			perObjectData = PerObjectData.None
+		};
+
 		filterSettings = new FilteringSettings(RenderQueueRange.opaque);
 		_context.DrawRenderers(_cullingResults, ref drawingSettings, ref filterSettings);
 		

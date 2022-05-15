@@ -16,7 +16,7 @@ MonoBehaviour:
   useGPUInstancing: 1
   useSRPBatcher: 1
   shadows:
-    maxDistance: 60
+    maxDistance: 100
     clouPassSettings: {fileID: 11400000, guid: d0442772a6057534894ad3e7f0ccf085, type: 2}
     directional:
       atlasSize: 4096

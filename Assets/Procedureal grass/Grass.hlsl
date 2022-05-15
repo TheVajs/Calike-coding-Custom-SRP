@@ -125,12 +125,10 @@ float4 Fragment(VertexOutput input) : SV_Target {
 
     float2 screenUV = input.anchorPositionScreen.xy / input.anchorPositionScreen.w;
     float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, screenUV);
-    //float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, screenUV);
     float currentDepth = input.positionCS.z;
 
-    //color = depth.rrrr;
-    if (currentDepth < depth) // distance(depth, input.positionCS.z) > _minDepthDistance)
-        discard; //color = float4(1,1,1,1); // 
+    if (currentDepth < depth) 
+        discard; 
     return color;
 }
 #endif

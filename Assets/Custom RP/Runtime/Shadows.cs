@@ -15,7 +15,11 @@ public class Shadows
 
     public static readonly Matrix4x4[] DirShadowMatrices = new Matrix4x4[MaxShadowedDirectionalLightCount];
     
-    //private static readonly Vector4[] cascadeData = new Vector4[maxCas]
+    static string[] directionalFilterKeywords = {
+        "_DIRECTIONAL_PCF3",
+        "_DIRECTIONAL_PCF5",
+        "_DIRECTIONAL_PCF7",
+    };
 
     public struct ShadowedDirectionalLight
     {
@@ -34,6 +38,8 @@ public class Shadows
     private ScriptableRenderContext _context;
     private CullingResults _cullingResults;
     private ShadowSettings _settings;
+    private const int Depth = 32;
+    private const FilterMode Filter = FilterMode.Point;
 
     private ShadowCloudPass _cloudPass;
 
@@ -55,21 +61,20 @@ public class Shadows
         else
         {
             _buffer.GetTemporaryRT(DirShadowAtlasId, 1, 1,
-                32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap
+                32, FilterMode.Point, RenderTextureFormat.Shadowmap
             );
         }
     }
-
+    
     private void RenderDirectionalShadows()
     {
         var atlasSize = (int)_settings.directional.atlasSize;
         
-        // Claims a square render texture, but is ARGB by default.
-        _buffer.GetTemporaryRT(DirShadowAtlasId, atlasSize, atlasSize,
-            32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap);
-        _buffer.SetRenderTarget(DirShadowAtlasId,
-            RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+        //_buffer.SetShadowSamplingMode(DirShadowAtlasId, ShadowSamplingMode.RawDepth);
+        _buffer.GetTemporaryRT(DirShadowAtlasId, atlasSize, atlasSize, Depth, Filter, RenderTextureFormat.Shadowmap);
+        _buffer.SetRenderTarget(DirShadowAtlasId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store); 
         
+
         _buffer.ClearRenderTarget(true, false, Color.clear);
         _buffer.BeginSample(BufferName);
         ExecuteBuffer();
@@ -82,50 +87,112 @@ public class Shadows
         }
 
         _buffer.SetGlobalMatrixArray(DirShadowMatricesId, DirShadowMatrices);
+        
+        SetKeywords();
+        
+        _buffer.EndSample(BufferName); 
         ExecuteBuffer();
 
-        
+        ApplyProceduralNoise();
+    }
+    
+    private void SetKeywords () {
+        var enabledIndex = (int) _settings.directional.filter - 1;
+        for (var i = 0; i < directionalFilterKeywords.Length; i++) {
+            if (i == enabledIndex) {
+                _buffer.EnableShaderKeyword(directionalFilterKeywords[i]);
+            }
+            else {
+                _buffer.DisableShaderKeyword(directionalFilterKeywords[i]);
+            }
+        }
+    }
 
-        //_buffer.SetGlobalTexture("_TestTexture", DirShadowAtlasId);
+
+    RenderTexture m_Shadowmap;
+    private CommandBuffer m_BufGrabShadowmap = new CommandBuffer
+    {
+        name = "Grab shadowmap for Volumetric Fog"
+    };
+    
+    
+    private void ApplyProceduralNoise()
+    {
+        ExecuteBuffer();
+        var atlasSize = (int)_settings.directional.atlasSize;
+        
+        var temp = Shader.PropertyToID("_test");
+        m_BufGrabShadowmap.GetTemporaryRT(temp, atlasSize, atlasSize, Depth, Filter, RenderTextureFormat.RFloat);
+        m_BufGrabShadowmap.SetRenderTarget(temp, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+        m_BufGrabShadowmap.CopyTexture(DirShadowAtlasId, temp);
+        _context.ExecuteCommandBuffer(m_BufGrabShadowmap);
+        m_BufGrabShadowmap.Clear();
+        
+        
+         RenderTextureFormat format = RenderTextureFormat.RFloat;
+          
+         ReleaseTemporary(ref m_Shadowmap);
+         m_Shadowmap = RenderTexture.GetTemporary(atlasSize, atlasSize, 32, format, RenderTextureReadWrite.Linear);
+         m_Shadowmap.filterMode = FilterMode.Point;
+         m_Shadowmap.wrapMode = TextureWrapMode.Clamp;
+
+         var tID = new RenderTargetIdentifier(m_Shadowmap);
+         //m_BufGrabShadowmap.SetShadowSamplingMode(m_Shadowmap, ShadowSamplingMode.RawDepth);
+         //m_BufGrabShadowmap.CopyTexture(DirShadowAtlasId, tID);
+         //m_BufGrabShadowmap.SetShadowSamplingMode(tID, ShadowSamplingMode.RawDepth);
+         _context.ExecuteCommandBuffer(m_BufGrabShadowmap);
+         m_BufGrabShadowmap.Clear();
+         
+         //m_BufGrabShadowmap.SetShadowSamplingMode(m_Shadowmap, ShadowSamplingMode.RawDepth);
+         //m_BufGrabShadowmap.SetShadowSamplingMode(DirShadowAtlasId, ShadowSamplingMode.RawDepth);
+ 
+         //m_BufGrabShadowmap.SetGlobalTexture("_DirShadowmap", m_Shadowmap);
+         m_BufGrabShadowmap.Blit(temp, tID, _cloudPass.material,  0);
+         _context.ExecuteCommandBuffer(m_BufGrabShadowmap);
+         m_BufGrabShadowmap.Clear();
+
+         m_BufGrabShadowmap.CopyTexture(tID, DirShadowAtlasId);
+         _buffer.ReleaseTemporaryRT(temp);
+         
+         _context.ExecuteCommandBuffer(m_BufGrabShadowmap);
+         m_BufGrabShadowmap.Clear();
+         
+         
+        /* 
+        
+        _buffer.GetTemporaryRT(DirShadowNoiseId, atlasSize, atlasSize, Depth, Filter, RenderTextureFormat.RFloat);
         //_buffer.SetRenderTarget(DirShadowNoiseId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-        //_buffer.Blit(DirShadowAtlasId, DirShadowNoiseId);
-        ExecuteBuffer();
 
-        //_buffer.SetShadowSamplingMode(DirShadowAtlasId, ShadowSamplingMode.RawDepth);
-
-        //_buffer.SetShadowSamplingMode(DirShadowAtlasId, ShadowSamplingMode.RawDepth);
-        //_buffer.Blit(DirShadowAtlasId, DirShadowNoiseId);
-        //_buffer.SetGlobalTexture("_DirectionalNoiseShadowAtlas", DirShadowNoiseId);
+        var temp = Shader.PropertyToID("_test");
+        _buffer.GetTemporaryRT(temp, atlasSize, atlasSize, Depth, Filter, RenderTextureFormat.RFloat);
+        _buffer.SetRenderTarget(temp, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
         
-        //_buffer.Blit(DirShadowAtlasId, _temporaryBufferId,  _cloudPass.material, ShaderData.Pass.Copy);
-        //Draw(DirShadowNoiseId, DirShadowAtlasId, Pass.Copy);
-        
-        _buffer.GetTemporaryRT(DirShadowNoiseId, atlasSize, atlasSize,
-            32, FilterMode.Bilinear, RenderTextureFormat.RFloat);
-        _buffer.SetRenderTarget(DirShadowNoiseId,
-           RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-
-        int temp = Shader.PropertyToID("_test");
-        _buffer.GetTemporaryRT(temp, atlasSize, atlasSize,
-            32, FilterMode.Bilinear, RenderTextureFormat.RFloat);
-        _buffer.SetRenderTarget(temp,
-            RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
         _buffer.CopyTexture(DirShadowAtlasId, temp);
-        _buffer.SetGlobalTexture("_MainTex", DirShadowAtlasId);
-        //_buffer.ClearRenderTarget(true, false, Color.clear);
         ExecuteBuffer();
         
-        //_buffer.SetShadowSamplingMode(DirShadowAtlasId, ShadowSamplingMode.RawDepth);
         //_buffer.CopyTexture(DirShadowAtlasId, DirShadowNoiseId);
-        _buffer.Blit(temp, DirShadowNoiseId, _cloudPass.material);
-
-        //_buffer.DrawProcedural( Matrix4x4.identity, _cloudPass.material, 0, MeshTopology.Triangles, 3);
-        _buffer.SetGlobalTexture("_DirectionalNoiseShadowAtlas", DirShadowNoiseId);
+        _buffer.Blit(temp, DirShadowNoiseId, _cloudPass.material, -1);
+        
+        var targetRT = new RenderTargetIdentifier(DirShadowAtlasId);
+        _buffer.Blit(DirShadowNoiseId, targetRT);
+        //_buffer.Blit(DirShadowNoiseId, DirShadowAtlasId);
+        
+        //_buffer.SetGlobalTexture("_DirectionalShadowAtlas", DirShadowAtlasId);
+        //_buffer.Blit(DirShadowNoiseId, DirShadowAtlasId, _cloudPass.material, -1);
         _buffer.EndSample(BufferName);        
         ExecuteBuffer();
         
         _buffer.ReleaseTemporaryRT(temp);
-        ExecuteBuffer();
+        ExecuteBuffer();*/
+    }
+    
+    void ReleaseTemporary(ref RenderTexture rt)
+    {
+        if (rt == null)
+            return;
+
+        RenderTexture.ReleaseTemporary(rt);
+        rt = null;
     }
     
     private  Matrix4x4 ConvertToAtlasMatrix (Matrix4x4 m, Vector2 offset, int split) {
@@ -207,6 +274,8 @@ public class Shadows
 
     public void Cleanup()
     {
+        m_BufGrabShadowmap?.Clear();
+
         _buffer.ReleaseTemporaryRT(DirShadowAtlasId);
         _buffer.ReleaseTemporaryRT(DirShadowNoiseId);
         ExecuteBuffer();

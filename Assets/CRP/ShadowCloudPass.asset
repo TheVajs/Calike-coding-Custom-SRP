@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: ShadowCloudPass
   m_EditorClassIdentifier: 
   shader: {fileID: 4800000, guid: 34200d1ba0a94ddeb88fd9c613984a87, type: 3}
-  texture: {fileID: 2800000, guid: 127ac193b2edcd24d858957ed44fa3e0, type: 3}
+  texture: {fileID: 2800000, guid: 8d3ceefcfe8a7d24ca8ac406abe02a1c, type: 3}

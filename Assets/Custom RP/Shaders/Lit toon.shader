@@ -18,7 +18,7 @@ Shader "Custom RP/Lit toon"
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("Dst Blend", Float) = 0
         [Enum(Off, 0, On, 1)] _ZWrite("Z Write", Float) = 1
     }
-    CustomEditor "CustomShaderGUI"
+    //CustomEditor "CustomShaderGUI"
     
     SubShader
     {

@@ -6,23 +6,17 @@ namespace Custom_RP.Runtime
     [CreateAssetMenu(fileName = "ShadowCloudPass", menuName = "Custom/ShadowCloudPass")]
     public class ShadowCloudPass : ScriptableObject
     {
-        [SerializeField] private Shader shader = default;
-        [SerializeField] private Texture texture = default;
-    
-        [System.NonSerialized]
-        private Material _material;
+        [SerializeField] private Material mat;
 
-        private static readonly int NoiseTex = Shader.PropertyToID("_NoiseTex");
+        //private static readonly int NoiseTex = Shader.PropertyToID("_NoiseTex");
 
-        public Material material {
-            get {
-                if (_material == null && shader != null) {
-                    _material = new Material(shader);
-                    _material.SetTexture(NoiseTex, texture as Texture2D);
-                    _material.hideFlags = HideFlags.HideAndDontSave;
+        public Material material => mat;
+            /*if (mat == null) {
+                    mat = new Material(shader);
+                    mat.SetTexture(NoiseTex, texture as Texture2D);
+                    mat.hideFlags = HideFlags.HideAndDontSave;
                 }
-                return _material;
-            }
-        }
+                */
+            
     }
 }

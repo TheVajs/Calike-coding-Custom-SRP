@@ -10,7 +10,7 @@ Shader "Custom RP/Unlit"
 		[Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst Blend", Float) = 0
     	[Enum(Off, 0, On, 1)] _ZWrite ("Z Write", Float) = 1
     }
-	CustomEditor "CustomShaderGUI"
+	//CustomEditor "CustomShaderGUI"
     SubShader
     {
         // Defines 1 way to render something.

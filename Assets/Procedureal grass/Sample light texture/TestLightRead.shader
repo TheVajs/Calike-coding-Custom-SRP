@@ -3,7 +3,7 @@ Shader "Custom RP/Test light read"
     Properties
     {
     }
-    CustomEditor "CustomShaderGUI"
+    //CustomEditor "CustomShaderGUI"
     
     SubShader
     {
@@ -45,17 +45,14 @@ Shader "Custom RP/Test light read"
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : VAR_POSITION;
                 float3 normalWS : VAR_NORMAL;
-                float2 baseUV : VAR_BASE_UV;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             Varyings LitPassVertex(Attributes input) {
                 Varyings output;
-                // This extracts the index from the input and stores it in a global static variable that the other instancing macros rely on.
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 
-
                 output.positionWS = TransformObjectToWorld(input.positionOS);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);

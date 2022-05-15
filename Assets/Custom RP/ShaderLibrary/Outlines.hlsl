@@ -122,7 +122,7 @@ half4 frag(Varyings input) : SV_TARGET
 
    float2 screenUV = input.screenPosition.xy/input.screenPosition.w;
    //float depthBorder = depthEdgeIndicator(screenUV) > 0.0 ? 1.0 : 0.0;
-   float u = SAMPLE_TEXTURE2D(_DirectionalNoiseShadowAtlas, sampler_DirectionalNoiseShadowAtlas, screenUV);
+   //float u = SAMPLE_DEPTH_TEXTURE(_DirectionalNoiseShadowAtlas, sampler_DirectionalNoiseShadowAtlas, screenUV);
 
    float3 shadowColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _ShadowColor).rgb;
    float3 midtone = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _MidToneColor).rgb;

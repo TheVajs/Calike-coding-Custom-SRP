@@ -6,12 +6,14 @@ public class Params
     private const string BufferName = "_CustomParams";
     private readonly CommandBuffer _buffer = new CommandBuffer { name = BufferName };
 
-    public const int MaxDirLightCount = 4;
-
     private static readonly int
         ScreenParamsId = Shader.PropertyToID("_ScreenParams"),
         ProjectionParamsId = Shader.PropertyToID("_ProjectionParams"),
-        ZBufferParams = Shader.PropertyToID("_ZBufferParams");
+        ZBufferParams = Shader.PropertyToID("_ZBufferParams"),
+        TimeId = Shader.PropertyToID("_Time"),
+        SinTimeId = Shader.PropertyToID("_SinTime"),
+        CosTimeId = Shader.PropertyToID("_CosTime"),
+        TimeParametersId = Shader.PropertyToID("_TimeParameters");
 
     public void Setup(ScriptableRenderContext context, Camera camera) 
     {
@@ -40,6 +42,48 @@ public class Params
         zbufferParams.z = zbufferParams.x / far;
         zbufferParams.w = zbufferParams.y / far;
         _buffer.SetGlobalVector(ZBufferParams, screenParams);
+
+        var t = Time.time;
+        
+        // (t/20, t, t*2, t*3)		
+        var time = new Vector4
+        {
+            x = t / 20,
+            y = t,
+            z = t * 2,
+            w = t* 2
+        };	   
+        _buffer.SetGlobalVector(TimeId, time);
+        
+        // sin(t/8), sin(t/4), sin(t/2), sin(t)
+        var sinTime = new Vector4
+        {
+            x = Mathf.Sin(t/8),
+            y = Mathf.Sin(t/4),
+            z = Mathf.Sin(t/2),
+            w = Mathf.Sin(t)
+        };
+        _buffer.SetGlobalVector(SinTimeId, sinTime);
+        
+        // cos(t/8), cos(t/4), cos(t/2), cos(t)
+        var cosTime = new Vector4
+        {
+            x = Mathf.Cos(t/8),
+            y = Mathf.Cos(t/4),
+            z = Mathf.Cos(t/2),
+            w = Mathf.Cos(t)
+        };
+        _buffer.SetGlobalVector(CosTimeId, cosTime);
+        
+        // t, sin(t), cos(t)
+        var timeParameters = new Vector4
+        {
+            x = t,
+            y = Mathf.Sin(t),
+            z = Mathf.Cos(t)
+        };     
+        _buffer.SetGlobalVector(TimeParametersId, timeParameters);
+        
 
         _buffer.EndSample(BufferName);
         context.ExecuteCommandBuffer(_buffer);

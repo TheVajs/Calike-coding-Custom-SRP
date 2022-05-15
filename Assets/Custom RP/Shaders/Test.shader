@@ -2,9 +2,11 @@ Shader "Custom RP/Test"
 {
     Properties
     {
-        _TestTexture ("Textvbure", 2D) = "white" {}
         _NoiseTex ("Texdture", 2D) = "white" {}
         _MainTex ("Texsture", 2D) = "white" {}
+    	_NoiseBottom ("Bottom", Range(0.0, 1.0)) = .1
+    	_NoiseTop ("Top", Range(0.0, 1.0)) = .55
+		[ShowAsVector2] _AnimationSpeed ("Animation Speed", Vector) = (0, 0, 0, 0)
     }
     
     SubShader
@@ -25,12 +27,10 @@ Shader "Custom RP/Test"
             #include "../ShaderLibrary/Shadows.hlsl"
             #include "../ShaderLibrary/Surface.hlsl"
             #include "../ShaderLibrary/Light.hlsl"
-
-            TEXTURE2D(_TestTexture);
-            SAMPLER(sampler_TestTexture);
             
             TEXTURE2D(_NoiseTex);
             SAMPLER(sampler_NoiseTex);
+            float4 _NoiseTex_ST;
 
 			TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -49,7 +49,11 @@ Shader "Custom RP/Test"
                 float3 positionWS : TEXCOORD0;
 				float4 screenPosition : TEXCOORD3; 
 				float2 screenUV : VAR_SCREEN_UV;
+				float2 noiseUV : TEXCOORD2;
             };
+
+            float _NoiseBottom, _NoiseTop;
+            float2 _AnimationSpeed;
 
             Varyings DefaultPassVertex (Attributes input) {
 	            Varyings output;
@@ -58,20 +62,22 @@ Shader "Custom RP/Test"
 				output.screenPosition = ComputeScreenPos(output.positionCS);
             	output.normalWS = float3(0, 1, 0);
 	            output.screenUV = TRANSFORM_TEX(input.uv, _MainTex);
+	            output.noiseUV = TRANSFORM_TEX(input.uv, _NoiseTex);
 	            return output;
             }
 
             float LitPassFragment(Varyings input) : SV_TARGET  {
                 float2 screenUV = input.screenPosition.xy/input.screenPosition.w;
-				float r = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, screenUV);
-            	
-            	//float4x4 mat = _DirectionalShadowMatrices[_DirectionalLightShadowData[0].y];
-            	//float3 positionSTS = mul(mat, float3(input.screenPosition.x * 100, 0, input.screenPosition.z * 100)).xyz; //float4(input.positionWS+ .1, 1.0)).xyz;
-                //float r = SAMPLE_TEXTURE2D_SHADOW(_DirectionalShadowAtlas, SHADOW_SAMPLER, positionSTS); // SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.screenUV);
+				float shadow = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, screenUV);
 
-            	float s =  SAMPLE_DEPTH_TEXTURE(_NoiseTex, sampler_NoiseTex, input.screenUV);
-            	//float s = GetDirectionalShadowAttenuation(0, input.positionWS, input.normalWS);
-                return lerp(r, 1, step((1 - s), 0.7) ); //smoothstep(0, .1, ); //r ; //(r * s.r * input.screenUV.y).rrrr * 10; // r * 10; //* s.r * .1;
+            	float2 tilling = _Time.xy * _AnimationSpeed;
+
+            	float cloudNoise = SAMPLE_DEPTH_TEXTURE(_NoiseTex, sampler_NoiseTex, input.noiseUV + tilling);
+
+            	float shadowStep = 0; //lerp(shadow, .8, 1 - cloudNoise);
+            	shadowStep = smoothstep(shadow, cloudNoise, .6) + shadow*.3;
+
+                return max(shadow ,smoothstep(_NoiseBottom, _NoiseTop, cloudNoise + screenUV.y*.15));
             }
 
             ENDHLSL
